@@ -1,1 +1,0 @@
-# ateema_capstone
