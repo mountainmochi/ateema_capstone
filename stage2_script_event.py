@@ -156,7 +156,6 @@ if events_df.empty:
     print("No events found.")
 else:
     # Save to CSV (optional)
-    events_df.to_csv('scraped_events.csv', index=False)
+    events_df.to_csv('stage2_data_events.csv', index=False)
     print("Events saved to scraped_events.csv")
     print(events_df.head())  # Print the first few rows
-
