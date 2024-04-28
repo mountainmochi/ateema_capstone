@@ -106,7 +106,7 @@ from nltk.stem import WordNetLemmatizer
 df = pd.read_csv('stage1_data_family.csv', skiprows=[1])
 # print(df.columns)
 
-punctuation = '!”$%&\’()*+,-./:;<=>?[\\]^_`{|}~•@©'
+punctuation = '!”$%&\’()*+,-./:;<=>?[\\]^_`{|}~•@©—'
 
 def remove_links(text):
     """Takes a string and removes web links from it"""
@@ -169,10 +169,12 @@ def lemmatize_word(text):
     wordnet = WordNetLemmatizer()
     return " ".join([wordnet.lemmatize(word) for word in text])
 
+
 # Apply basic cleaning to the 'description' column and store the result in 'text_cleaned'
 df['text_cleaned'] = df['description'].apply(basic_clean)
-# df['text_cleaned'] = df['text_cleaned'].apply(remove_stopwords)
-# df['text_cleaned'] = df['text_cleaned'].apply(lemmatize_word)
+df['text_cleaned_lemmatized'] = df['text_cleaned'].apply(remove_stopwords)
+df['text_cleaned_lemmatized'] = df['text_cleaned_lemmatized'].apply(lemmatize_word)
+# df['text_cleaned_token'] = df['text_cleaned_token'].apply(remove_stopwords)
 
 df.to_csv('stage1_data_family.csv', index=False)
 
