@@ -2,7 +2,7 @@ import pandas as pd
 import re
 from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import CSVLoader
-from langchain_community.embeddings import GPT4AllEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_community.llms import Ollama
@@ -34,17 +34,32 @@ class RecommendationSystem:
     def _initialize_system(self):
         """Initializes the recommendation system by loading data, setting up vector store, retriever, and LLM."""
         try:
+            # Load data
             data = self.loader.load()
+            print("Data loaded successfully")
+            
+            # Split texts
             texts = self.text_splitter.split_documents(data)
-
+            print(f"Texts split into {len(texts)} chunks")
+            
+            # Initialize embeddings and vector store
             self.vectorstore = Chroma.from_documents(
                 documents=texts,
                 collection_name="rag-chroma",
-                embedding=GPT4AllEmbeddings(model_name='all-MiniLM-L6-v2.gguf2.f16.gguf')
+                embedding=HuggingFaceEmbeddings()
             )
-
+            print("Vector store initialized")
+            
+            # Initialize retriever
             self.retriever = self.vectorstore.as_retriever()
+            print("Retriever initialized")
+            
+        except Exception as e:
+            print(f"Error initializing system: {e}")
+            self.vectorstore = None
+            self.retriever = None
 
+        try:
             self.llm = Ollama(model=self.local_llm, format="json", temperature=0)
 
             self.prompt_template_retrieval_grader = PromptTemplate(
@@ -67,10 +82,8 @@ class RecommendationSystem:
                             Greet the user warmly and provide detailed recommendations based on their specified location and interests.
                             Ensure the response includes exactly 2 recommendations for each of the following categories: dining, beverages, entertainment, 
                             cultural activities, outdoor activities, educational activities, and shopping based on {question}.
-                            Recommendations in each category should be sequentially numbered, continuing from one category to the next, resulting in a total of 14 recommendations.  
-                            Avoid being a cut off generating recommendations and using quotation marks in the explanations. The response should be concise yet detailed, fitting within 60 seconds of speaking.
-                            Conclude with a professional closing statement, as there will be no further dialogue.
-                            
+                            Recommendations in each category should be sequentially numbered, continuing from one category to the next, resulting in a total of 14 recommendations. Make sure to go with a title and a description 
+                            Please avoid being a cut off generating recommendations specifically Millennium Park in the explanations. Make sure to conclude with a professional closing statement, making sure to not mention reaching out again.
                             Here is the user question: {question}
                             Here are some places you can recommend based on the retrieved documents:
                             {context}""",
@@ -113,6 +126,7 @@ class RecommendationSystem:
             )
 
             self.answer_grader = self.prompt_template_answer_grader | self.llm | JsonOutputParser()
+            
         except Exception as e:
             print(f"Error initializing system: {e}")
 
@@ -292,23 +306,28 @@ class RecommendationSystem:
         else:
             print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
             return "not supported"
-
+        
     def parse_response(self, response: str, documents: List[Document]) -> Dict:
         """Parses the generated response and matches it with the original CSV data to extract URLs."""
         try:
             # Extract titles with numbers
-            titles_with_numbers = re.findall(r'\d+\.\s(.*?)\s-\s', response)
-            # Remove numbers from the titles
-            titles = [re.sub(r'^\d+\.\s', '', title) for title in titles_with_numbers]
-            normalized_titles = [self._normalize_text(title) for title in titles]
+            titles_with_numbers = re.findall(r'\d+\.\s([^-\n]+)', response)
+            print("Extracted titles without descriptions:", titles_with_numbers)
+
+            normalized_titles = [self._normalize_text(title) for title in titles_with_numbers]
+            print("Normalized titles:", normalized_titles)
 
             # Load the original CSV file to match against the title_cleaned and get the image URLs
             df = pd.read_csv(self.loader.file_path)
+            df['normalized_title_cleaned'] = df['title_cleaned'].apply(self._normalize_text)
+            print("Loaded and normalized CSV DataFrame:\n", df.head())
 
             recommendations = []
             url_info = []
             for index, (title_with_number, normalized_title) in enumerate(zip(titles_with_numbers, normalized_titles), start=1):
-                match = df[df['title_cleaned'].str.contains(normalized_title, na=False, case=False)]
+                match = df[df['normalized_title_cleaned'].str.contains(normalized_title, na=False, case=False)]
+                print(f"Matching '{normalized_title}' with titles in CSV, found matches:", match)
+                
                 if not match.empty:
                     url = match.iloc[0]['image']
                     match_status = "Yes"
@@ -316,8 +335,8 @@ class RecommendationSystem:
                 else:
                     url_status = "No URL available"
                     match_status = "No"
-                recommendations.append(f"{index}. {title_with_number}")
-                url_info.append({"Title": title_with_number, "Match": match_status, "URL": url_status})
+                recommendations.append(f"{index}. {title_with_number.strip()}")
+                url_info.append({"Title": title_with_number.strip(), "Match": match_status, "URL": url_status})
 
             # Create a human-readable formatted response
             formatted_prompt = response.strip().replace("\\n", "\n").replace("\\'", "'")
@@ -334,4 +353,4 @@ class RecommendationSystem:
 
     def _normalize_text(self, text: str) -> str:
         """Normalizes text for matching purposes."""
-        return re.sub(r'\s+', '', text.lower().replace("the", "").replace("'", "").replace("-", "").replace(",", ""))
+        return re.sub(r'\s+', '', text.lower().replace("the", "").replace("'", "").replace("-", "").replace(",", "").replace(".", ""))
