@@ -312,15 +312,12 @@ class RecommendationSystem:
         try:
             # Extract titles with numbers
             titles_with_numbers = re.findall(r'\d+\.\s([^-\n]+)', response)
-            print("Extracted titles without descriptions:", titles_with_numbers)
 
             normalized_titles = [self._normalize_text(title) for title in titles_with_numbers]
-            print("Normalized titles:", normalized_titles)
 
             # Load the original CSV file to match against the title_cleaned and get the image URLs
             df = pd.read_csv(self.loader.file_path)
             df['normalized_title_cleaned'] = df['title_cleaned'].apply(self._normalize_text)
-            print("Loaded and normalized CSV DataFrame:\n", df.head())
 
             recommendations = []
             url_info = []
