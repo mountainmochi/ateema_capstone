@@ -305,11 +305,19 @@ class RecommendationSystem:
             print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
             return "not supported"
         
+
     def parse_response(self, response: str, documents: List[Document]) -> Dict:
         """Parses the generated response and matches it with the original CSV data to extract URLs."""
         try:
+            # Remove any JSON-like wrapping if present
+            response = re.sub(r'^.*?"value":\s*"', '', response)
+            response = re.sub(r'"}\s*$', '', response)
+            
+            # Unescape any escaped characters
+            response = response.replace('\\r\\n', '\n').replace('\\"', '"')
+
             # Extract titles with numbers
-            titles_with_numbers = re.findall(r'\d+\.\s([^-\n]+)', response)
+            titles_with_numbers = re.findall(r'\d+\.\s*\*\*(.*?)\*\*:', response, re.DOTALL)
 
             normalized_titles = [self._normalize_text(title) for title in titles_with_numbers]
 
@@ -334,7 +342,7 @@ class RecommendationSystem:
                 url_info.append({"Title": title_with_number.strip(), "Match": match_status, "URL": url_status})
 
             # Create a human-readable formatted response
-            formatted_prompt = response.strip().replace("\\n", "\n").replace("\\'", "'")
+            formatted_prompt = response.strip()
 
             formatted_response = {
                 "recommendation": formatted_prompt,
@@ -342,9 +350,10 @@ class RecommendationSystem:
             }
 
             return formatted_response
+
         except Exception as e:
             print(f"Error parsing response: {e}")
-            return {"recommendation": "", "url_information": []}
+            return {"recommendation": response, "url_information": []}
 
     def _normalize_text(self, text: str) -> str:
         """Normalizes text for matching purposes."""
