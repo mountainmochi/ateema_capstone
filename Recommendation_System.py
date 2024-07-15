@@ -305,7 +305,6 @@ class RecommendationSystem:
             print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
             return "not supported"
         
-
     def parse_response(self, response: str, documents: List[Document]) -> Dict:
         """Parses the generated response and matches it with the original CSV data to extract URLs."""
         try:
@@ -350,7 +349,6 @@ class RecommendationSystem:
             }
 
             return formatted_response
-
         except Exception as e:
             print(f"Error parsing response: {e}")
             return {"recommendation": response, "url_information": []}
