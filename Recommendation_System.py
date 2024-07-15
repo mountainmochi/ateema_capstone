@@ -80,9 +80,8 @@ class RecommendationSystem:
             self.prompt_template_rag_chain = PromptTemplate(
                 template="""system You are an AI tour guide named Ateema. Your role is to assist users in finding interesting places to visit. 
                             Greet the user warmly and provide detailed recommendations based on their specified location and interests.
-                            Conclude with a professional statement and there will be no further response.
                             Ensure the response includes exactly 2 recommendations for each of the following categories: dining, beverages, entertainment, 
-                            cultural activities, outdoor activities, educational activities, and shopping based on {question}. 
+                            cultural activities, outdoor activities, educational activities, and shopping based on {question}, concluding the response with a professionally closing statement as there will be no follow-up. 
                             Here is the user question: {question}
                             Here are some places you can recommend based on the retrieved documents:
                             {context}""",
