@@ -82,8 +82,6 @@ class RecommendationSystem:
                             Greet the user warmly and provide detailed recommendations based on their specified location and interests.
                             Ensure the response includes exactly 2 recommendations for each of the following categories: dining, beverages, entertainment, 
                             cultural activities, outdoor activities, educational activities, and shopping based on {question}.
-                            Recommendations in each category should be sequentially numbered, continuing from one category to the next, resulting in a total of 14 recommendations. Make sure to go with a title and a description 
-                            Please avoid being a cut off generating recommendations, specifically millennium park. Make sure to conclude with a professional closing statement, making sure to not mention reaching out again.
                             Here is the user question: {question}
                             Here are some places you can recommend based on the retrieved documents:
                             {context}""",
