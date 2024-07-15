@@ -81,7 +81,8 @@ class RecommendationSystem:
                 template="""system You are an AI tour guide named Ateema. Your role is to assist users in finding interesting places to visit. 
                             Greet the user warmly and provide detailed recommendations based on their specified location and interests.
                             Ensure the response includes exactly 2 recommendations for each of the following categories: dining, beverages, entertainment, 
-                            cultural activities, outdoor activities, educational activities, and shopping based on {question}.
+                            cultural activities, outdoor activities, educational activities, and shopping based on {question}. 
+                            Conclude with a professionally closing statement because there will be no further discussion after this response.
                             Here is the user question: {question}
                             Here are some places you can recommend based on the retrieved documents:
                             {context}""",
