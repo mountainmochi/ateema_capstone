@@ -83,7 +83,7 @@ class RecommendationSystem:
                             Ensure the response includes exactly 2 recommendations for each of the following categories: dining, beverages, entertainment, 
                             cultural activities, outdoor activities, educational activities, and shopping based on {question}.
                             Recommendations in each category should be sequentially numbered, continuing from one category to the next, resulting in a total of 14 recommendations. Make sure to go with a title and a description 
-                            Please avoid being a cut off generating recommendations. Make sure to conclude with a professional closing statement, making sure to not mention reaching out again.
+                            Please avoid being a cut off generating recommendations, specifically millennium park. Make sure to conclude with a professional closing statement, making sure to not mention reaching out again.
                             Here is the user question: {question}
                             Here are some places you can recommend based on the retrieved documents:
                             {context}""",
@@ -203,7 +203,6 @@ class RecommendationSystem:
             return {"documents": documents, "question": question, "generation": ""}
 
     def generate_recommendation(self, customer_info: Dict) -> Dict:
-        """Generates recommendations based on customer information."""
         try:
             question = self.construct_question(customer_info)
             state = {"question": question}
@@ -235,6 +234,7 @@ class RecommendationSystem:
         except Exception as e:
             print(f"Error generating recommendation: {e}")
             return {}
+
 
     def is_complete(self, response: str) -> bool:
         """Checks if the generated response is complete."""
