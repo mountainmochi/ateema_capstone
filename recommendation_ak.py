@@ -11,6 +11,7 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain_community.output_parsers.rail_parser import GuardrailsOutputParser
 from typing import List, Dict
+import textwrap
 
 class RecommendationSystem:
     def __init__(self, chroma_db_path, llm_model='llama3'):
@@ -37,11 +38,11 @@ class RecommendationSystem:
             # Load data
             data = self.loader.load()
             print("Data loaded successfully")
-            
+
             # Split texts
             texts = self.text_splitter.split_documents(data)
             print(f"Texts split into {len(texts)} chunks")
-            
+
             # Initialize embeddings and vector store
             self.vectorstore = Chroma.from_documents(
                 documents=texts,
@@ -49,22 +50,22 @@ class RecommendationSystem:
                 embedding=HuggingFaceEmbeddings()
             )
             print("Vector store initialized")
-            
+
             # Initialize retriever
             self.retriever = self.vectorstore.as_retriever()
             print("Retriever initialized")
-            
+
         except Exception as e:
             print(f"Error initializing system: {e}")
             self.vectorstore = None
             self.retriever = None
 
         try:
-            self.llm = Ollama(model=self.local_llm, format="json", temperature=0)
+            self.llm = Ollama(model=self.local_llm, format="json", temperature=0.2)
 
             self.prompt_template_retrieval_grader = PromptTemplate(
-                template="""system You are a grader assessing relevance 
-                of a retrieved document to a user question. If the document contains keywords related to the user question, 
+                template="""system You are a grader assessing relevance
+                of a retrieved document to a user question. If the document contains keywords related to the user question,
                 grade it as relevant. It does not need to be a stringent test. The goal is to filter out erroneous retrievals.
                 Give a binary score 'yes' or 'no' score to indicate whether the document is relevant to the question.
                 Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.
@@ -80,23 +81,27 @@ class RecommendationSystem:
             self.prompt_template_rag_chain = PromptTemplate(
                 template="""system: You are Ateema, an AI tour guide. Respond to the user's query using the following format precisely:
 
-                            1. Start with a warm greeting using the user's name if provided. Introduce yourself as Ateema.
+                            1. Start with "Hello [user's first name]! I'm Ateema, your AI tour guide."
 
                             2. Acknowledge the user's destination and group details if mentioned.
 
                             3. Provide exactly 2 recommendations for each of these categories: Dining, Beverages, Entertainment, Cultural Activities, Outdoor Activities, Educational Activities, and Shopping.
 
-                            4. Format each category and recommendation as follows:
-                            
-                            **Category Name:**
-                            1. **Place Name**: Brief description of the place and why it's suitable for the group.
-                            2. **Place Name**: Brief description of the place and why it's suitable for the group.
+                            4. Format each category and recommendation like below:
+
+                              **Category Name:**
+                              1. **Place Name**: Brief description of the place and why it's suitable for the group.
+                              2. **Place Name**: Brief description of the place and why it's suitable for the group.
 
                             5. End with a brief closing statement wishing them a good trip, without inviting further questions.
 
-                            6. Do not include any disclaimers or apologies about the information provided.
+                            6. End with "I hope you enjoy your trip to Chicago! Have a great time exploring this amazing city."
 
-                            7. Ensure the entire response is one continuous paragraph without line breaks between sections.
+                            7. Do not include any disclaimers or apologies about the information provided.
+
+                            8. Ensure the entire response is one continuous paragraph without line breaks between sections.
+
+                            9. Bold each recommendation place
 
                             User question: {question}
 
@@ -107,10 +112,10 @@ class RecommendationSystem:
             self.rag_chain = self.prompt_template_rag_chain | self.llm | StrOutputParser()
 
             self.prompt_template_hallucination_grader = PromptTemplate(
-                template="""system You are a grader assessing whether an answer is grounded in and supported by a set of facts from the provided documents. 
-                            Your goal is to ensure the answer does not include any information that contradicts the documents. 
-                            If the answer contains any information that directly contradicts the documents, grade it as 'no'. 
-                            If the answer is generally consistent with the facts in the documents and does not introduce significant contradictions, grade it as 'yes'. 
+                template="""system You are a grader assessing whether an answer is grounded in and supported by a set of facts from the provided documents.
+                            Your goal is to ensure the answer does not include any information that contradicts the documents.
+                            If the answer contains any information that directly contradicts the documents, grade it as 'no'.
+                            If the answer is generally consistent with the facts in the documents and does not introduce significant contradictions, grade it as 'yes'.
                             Missing information is acceptable as long as the provided information aligns with the overall content of the documents.
                             Provide the binary score 'yes' or 'no' as a JSON with a single key 'score' and no preamble or explanation.
 
@@ -118,10 +123,10 @@ class RecommendationSystem:
                             1. **Consistency**: Does the answer generally align with the facts provided in the documents?
                             2. **Completeness**: While the answer may not cover all details, it should not include any incorrect or invented details.
                             3. **Relevance**: The answer should be relevant to the question and broadly based on the facts from the documents.
-                            
+
                             Here are the facts from the documents:
                             {documents}
-                            
+
                             Here is the generated answer:
                             {generation}""",
                 input_variables=["generation", "documents"]
@@ -130,17 +135,18 @@ class RecommendationSystem:
             self.hallucination_grader = self.prompt_template_hallucination_grader | self.llm | JsonOutputParser()
 
             self.prompt_template_answer_grader = PromptTemplate(
-                template="""system You are a grader assessing whether an 
-                answer is useful to resolve a question. Give a binary score 'yes' or 'no' to indicate whether the answer is 
-                useful to resolve a question. Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.
-                Here is the answer:
-                {generation}
-                Here is the question: {question}""",
+                template="""You are a grader assessing whether an answer about a recommended Chicago place is useful and informative.
+                            Give a binary score 'yes' or 'no' to indicate whether the answer relates to Chicago.
+                            Provide the binary score as a JSON with a single key 'score' and no preamble or explanation.
+                            Here is the answer:
+                            {generation}
+
+                            Here is the question: {question}""",
                 input_variables=["generation", "question"],
             )
 
             self.answer_grader = self.prompt_template_answer_grader | self.llm | JsonOutputParser()
-            
+
         except Exception as e:
             print(f"Error initializing system: {e}")
 
@@ -166,7 +172,7 @@ class RecommendationSystem:
                         f"Our preferences include dining ({pref_dining}), beverages ({pref_beverage}), entertainment ({pref_entertainment}), "
                         f"cultural activities ({pref_cultural}), outdoor activities ({pref_outdoor}), educational activities ({pref_education}), "
                         f"and shopping ({pref_shop}). Can you recommend some interesting places to visit?")
-            
+
             return question
         except Exception as e:
             print(f"Error constructing question: {e}")
@@ -182,32 +188,32 @@ class RecommendationSystem:
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             return {}
-        
+
     def generate(self, state: Dict) -> Dict:
         try:
             print("---GENERATE---")
             question = state["question"]
             documents = state["documents"]
             context = "\n\n".join([doc.page_content for doc in documents])
-            
+
             prompt = self.prompt_template_rag_chain.format(question=question, context=context)
 
             generation = ""
             attempts = 0
             max_attempts = 3
-            
+
             while attempts < max_attempts:
                 generation = self.llm.invoke(prompt)
                 parsed_generation = StrOutputParser().parse(generation)
                 attempts += 1
-                
+
                 print(f"Generated response attempt {attempts}: {parsed_generation}")
 
-                # Check if the response is complete
-                if self.is_complete(parsed_generation):
-                    return {"documents": documents, "question": question, "generation": parsed_generation.strip()}  # Added strip() method
+                # Check if the response is complete and properly formatted
+                if self.is_complete_and_formatted(parsed_generation):
+                    return {"documents": documents, "question": question, "generation": parsed_generation.strip()}
                 else:
-                    print("Incomplete response, retrying...")
+                    print("Incomplete or improperly formatted response, retrying...")
 
             print(f"Incomplete response after {max_attempts} attempts")
             parsed_generation = "Sorry, I couldn't generate a complete response. Please try again."
@@ -225,15 +231,15 @@ class RecommendationSystem:
             state = self.retrieve(state)
             state = self.grade_documents(state)
             decision = self.decide_to_generate(state)
-            
+
             iteration_count = 0
             max_iterations = 3  # Adjusted to allow a reasonable number of iterations
-            
+
             while decision != "useful" and iteration_count < max_iterations:
                 iteration_count += 1
                 print(f"Iteration {iteration_count} : Generating response")
                 state = self.generate(state)
-                
+
                 # Print the generated response before hallucination check
                 print(f"Generated response: {state.get('generation', 'No generation')}")
 
@@ -250,8 +256,8 @@ class RecommendationSystem:
             return {}
 
 
-    def is_complete(self, response: str) -> bool:
-        """Checks if the generated response is complete."""
+    def is_complete_and_formatted(self, response: str) -> bool:
+        """Checks if the generated response is complete and properly formatted."""
         required_sections = [
             "dining",
             "beverages",
@@ -261,8 +267,37 @@ class RecommendationSystem:
             "educational activities",
             "shopping"
         ]
+
         response_lower = response.lower()
-        return all(section in response_lower for section in required_sections)
+
+        # Check if all required sections are present
+        missing_sections = [section for section in required_sections if section not in response_lower]
+        if missing_sections:
+            print(f"Format check failed: Missing sections - {', '.join(missing_sections)}")
+            return False
+
+        # Check if each section is properly formatted
+        section_pattern = r"\*\*(.+?):\*\*\s+1\. \*\*(.+?)\*\*: .+?\s+2\. \*\*(.+?)\*\*: .+?"
+        sections = re.findall(section_pattern, response, re.DOTALL)
+
+        if len(sections) != len(required_sections):
+            print(f"Format check failed: Expected {len(required_sections)} formatted sections, found {len(sections)}")
+            return False
+
+        # Check if all required sections are present in the correct format
+        formatted_sections = [section[0].lower() for section in sections]
+        missing_formatted_sections = [section for section in required_sections if section not in formatted_sections]
+        if missing_formatted_sections:
+            print(f"Format check failed: Missing or incorrectly formatted sections - {', '.join(missing_formatted_sections)}")
+            return False
+
+        # Check if the response ends with a closing statement
+        # if not re.search(r"I hope you enjoy your trip to Chicago! Have a great time exploring this amazing city\.$", response):
+        #     print("Format check failed: Missing or incorrect closing statement")
+        #     return False
+
+        print("Format check passed: All criteria met")
+        return True
 
     def grade_documents(self, state: Dict) -> Dict:
         """Grades the relevance of retrieved documents to the question."""
@@ -320,14 +355,14 @@ class RecommendationSystem:
         else:
             print("---DECISION: GENERATION IS NOT GROUNDED IN DOCUMENTS, RE-TRY---")
             return "not supported"
-        
+
     def parse_response(self, response: str, documents: List[Document]) -> Dict:
         """Parses the generated response and matches it with the original CSV data to extract URLs."""
         try:
             # Remove any JSON-like wrapping if present
             response = re.sub(r'^.*?"value":\s*"', '', response)
             response = re.sub(r'"}\s*$', '', response)
-            
+
             # Unescape any escaped characters
             response = response.replace('\\r\\n', '\n').replace('\\"', '"')
 
@@ -345,7 +380,7 @@ class RecommendationSystem:
             for index, (title_with_number, normalized_title) in enumerate(zip(titles_with_numbers, normalized_titles), start=1):
                 match = df[df['normalized_title_cleaned'].str.contains(normalized_title, na=False, case=False)]
                 print(f"Matching '{normalized_title}' with titles in CSV, found matches:", match)
-                
+
                 if not match.empty:
                     url = match.iloc[0]['image']
                     match_status = "Yes"
