@@ -1,4 +1,4 @@
-# Ateema - Ateema GenAI Travel Navigator
+# Project - Ateema GenAI Travel Navigator
 
 ## Prerequisite 
 
